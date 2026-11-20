@@ -1,0 +1,6 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+lab2/data/
+lab2/source/outputs/
