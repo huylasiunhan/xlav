@@ -57,8 +57,8 @@ class ExperimentConfig:
     dropout: float = 0.2  # Dropout probability for regularization
 
     # --- Training settings ---
-    lr: float = 1e-3  # Learning rate for optimizer
-    epochs: int = 25  # Number of training epochs
+    lr: float = 1e-4  # Learning rate tuned for high-dimensional (12,288-D) MLP inputs
+    epochs: int = 30  # Number of training epochs
     seed: int = 42  # Global random seed for reproducible splits and training
     device: str = field(default_factory=get_device)  # Evaluated dynamically per instance
 
