@@ -39,17 +39,42 @@ def compute_center_roi_box(
     height: int,
     width: int,
     roi_ratio: float,
+    aspect_ratio: float | None = None,
 ) -> tuple[int, int, int, int]:
-    """Compute centered rectangular ROI coordinates (x1, y1, x2, y2) for guided webcam capture."""
+    """Compute centered rectangular ROI coordinates (x1, y1, x2, y2) for guided webcam capture.
+
+    When aspect_ratio (width / height, e.g. 1.9 for VND polymer banknotes) is provided,
+    the box matches a horizontal banknote rectangle so room background borders are excluded.
+    """
     if not (0.1 <= roi_ratio <= 1.0):
         raise ValueError(f"roi_ratio must be in [0.1, 1.0], got {roi_ratio}.")
     box_w = max(16, int(round(width * roi_ratio)))
-    box_h = max(16, int(round(height * roi_ratio)))
+    if aspect_ratio is not None and aspect_ratio > 0.0:
+        box_h = max(16, int(round(box_w / aspect_ratio)))
+        if box_h > height:
+            box_h = max(16, int(round(height * roi_ratio)))
+            box_w = min(width, max(16, int(round(box_h * aspect_ratio))))
+    else:
+        box_h = max(16, int(round(height * roi_ratio)))
     x1 = (width - box_w) // 2
     y1 = (height - box_h) // 2
     x2 = min(width, x1 + box_w)
     y2 = min(height, y1 + box_h)
     return x1, y1, x2, y2
+
+
+def smooth_probabilities_ema(
+    prev_probs: dict[str, float] | None,
+    curr_probs: dict[str, float],
+    alpha: float = 0.40,
+) -> dict[str, float]:
+    """Apply Exponential Moving Average (EMA) across live frames to stabilize webcam predictions."""
+    if prev_probs is None or set(prev_probs.keys()) != set(curr_probs.keys()):
+        return dict(curr_probs)
+    return {
+        k: float(alpha * curr_probs[k] + (1.0 - alpha) * prev_probs[k])
+        for k in curr_probs
+    }
 
 
 def draw_prediction_overlay(
@@ -154,6 +179,7 @@ class CurrencyInferenceEngine:
         img_rgb: np.ndarray,
         params: ImageProcessingParams | None = None,
         roi_ratio: float | None = None,
+        roi_aspect_ratio: float | None = None,
     ) -> PredictionResult:
         """Run Module 1 -> Preprocess -> Module 2 on one RGB uint8 image/frame and measure latency."""
         active_params = params if params is not None else ImageProcessingParams()
@@ -163,11 +189,11 @@ class CurrencyInferenceEngine:
         processed = apply_image_pipeline(img_rgb, active_params)
         t1 = time.perf_counter()
 
-        # Optional center ROI crop (helps webcam mode focus on the held banknote)
+        # Optional center ROI crop (helps webcam mode focus strictly on the held banknote)
         roi_box: tuple[int, int, int, int] | None = None
         if roi_ratio is not None and 0.1 <= roi_ratio < 1.0:
             h, w = processed.shape[:2]
-            roi_box = compute_center_roi_box(h, w, roi_ratio)
+            roi_box = compute_center_roi_box(h, w, roi_ratio, aspect_ratio=roi_aspect_ratio)
             x1, y1, x2, y2 = roi_box
             crop_rgb = processed[y1:y2, x1:x2]
         else:
