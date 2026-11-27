@@ -297,12 +297,12 @@ class Flatten1D(BaseTransform):
 
 
 def build_augmentation_pipeline() -> Compose:
-    """Build domain-randomized training augmentation pipeline for real-world webcam robustness."""
+    """Build domain-randomized augmentation pipeline tailored for cropped Vietnamese banknotes."""
     return Compose([
-        RandomSyntheticBackground(bill_scale=(0.55, 0.92), inner_crop=(0.55, 0.88), p=0.65),
-        RandomResizedCrop(scale=(0.50, 1.0), p=0.65),
-        RandomRotation(max_angle=25.0, p=0.60),
-        RandomBrightnessContrast(brightness_range=(0.65, 1.65), contrast_range=(0.75, 1.35), wb_jitter=0.08, p=0.80),
+        RandomSyntheticBackground(bill_scale=(0.72, 0.96), inner_crop=(0.88, 1.0), p=0.25),
+        RandomResizedCrop(scale=(0.68, 1.0), p=0.60),
+        RandomRotation(max_angle=20.0, p=0.60),
+        RandomBrightnessContrast(brightness_range=(0.60, 1.75), contrast_range=(0.75, 1.35), wb_jitter=0.10, p=0.85),
         RandomHorizontalFlip(p=0.50),
         RandomMildBlur(p=0.25),
     ])

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torchvision import models
 
 from src.config import Lab3Config
 
@@ -140,10 +141,56 @@ class CurrencyCNN(BaseClassifier):
         return self.classifier(combined)
 
 
-def build_model(cfg: Lab3Config) -> BaseClassifier:
-    """Factory instantiating either MultiClassImageMLP or CurrencyCNN from Lab3Config."""
+class CurrencyMobileNetV2(BaseClassifier):
+    """Transfer-learning MobileNetV2 classifier with built-in ImageNet normalization.
+
+    Preserves rich pretrained edge/texture/digit features so real-world webcams recognize
+    Vietnamese banknotes robustly across varied camera sensors and room lighting.
+    """
+
+    def __init__(
+        self,
+        num_classes: int = 6,
+        dropout: float = 0.25,
+        pretrained: bool = True,
+    ) -> None:
+        super().__init__()
+        if num_classes < 2 or not (0.0 <= dropout < 1.0):
+            raise ValueError(f"Invalid CurrencyMobileNetV2 args: num_classes={num_classes}, dropout={dropout}.")
+
+        weights = models.MobileNet_V2_Weights.DEFAULT if pretrained else None
+        self.backbone = models.mobilenet_v2(weights=weights)
+
+        # Replace final ImageNet 1000-class head with our C-class VND banknote head
+        in_features = self.backbone.last_channel
+        self.backbone.classifier = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(in_features, num_classes),
+        )
+        # Initialize ONLY the newly attached linear head (never overwrite pretrained conv filters!)
+        nn.init.kaiming_normal_(self.backbone.classifier[1].weight, mode="fan_in", nonlinearity="relu")
+        nn.init.zeros_(self.backbone.classifier[1].bias)
+
+        # Register ImageNet channel statistics as buffers so [0, 1] inputs auto-normalize on any device
+        mean = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
+        self.register_buffer("imagenet_mean", mean)
+        self.register_buffer("imagenet_std", std)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Normalize [0, 1] RGB batch (B, 3, H, W) using ImageNet stats and emit raw logits (B, C)."""
+        if x.ndim != 4:
+            raise ValueError(f"CurrencyMobileNetV2 expects 4D tensor (B, 3, H, W), got shape {tuple(x.shape)}.")
+        x_norm = (x - self.imagenet_mean) / self.imagenet_std
+        return self.backbone(x_norm)
+
+
+def build_model(cfg: Lab3Config, pretrained: bool = True) -> BaseClassifier:
+    """Factory instantiating MultiClassImageMLP, CurrencyCNN, or CurrencyMobileNetV2 from Lab3Config."""
     if cfg.model_type == "mlp":
         return MultiClassImageMLP(cfg.input_dim, cfg.num_classes, cfg.hidden_dims, cfg.dropout)
     if cfg.model_type == "cnn":
         return CurrencyCNN(cfg.num_channels, cfg.num_classes, cfg.dropout)
-    raise ValueError(f"Unsupported model_type '{cfg.model_type}'. Expected 'mlp' or 'cnn'.")
+    if cfg.model_type == "mobilenet":
+        return CurrencyMobileNetV2(cfg.num_classes, cfg.dropout, pretrained=pretrained)
+    raise ValueError(f"Unsupported model_type '{cfg.model_type}'. Expected 'mlp', 'cnn', or 'mobilenet'.")

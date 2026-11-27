@@ -234,8 +234,8 @@ def load_checkpoint(
         device=device,
     )
 
-    # Instantiate exact architecture, load weights, and switch to inference mode
-    model = build_model(cfg)
+    # Instantiate exact architecture (pretrained=False avoids network download during local inference)
+    model = build_model(cfg, pretrained=False)
     model.load_state_dict(payload["state_dict"])
     model = model.to(torch.device(device))
     model.eval()

@@ -75,7 +75,7 @@ class Lab3Config:
     num_workers: int = 0  # Worker processes (0 avoids macOS/Streamlit fork overhead)
 
     # --- Model settings ---
-    model_type: str = "mlp"  # "mlp" (Lab #02 multi-class upgrade) or "cnn"
+    model_type: str = "mlp"  # "mlp" (Lab #02 upgrade), "cnn", or "mobilenet" (Transfer Learning)
     hidden_dims: tuple[int, ...] = (512, 256, 128)  # Hidden layer widths for MultiClassImageMLP
     activation_name: str = "relu"  # Custom activation key (relu, leaky_relu, tanh, sigmoid)
     init_method: str = "he"  # Weight initializer key (normal, xavier, he)
@@ -115,8 +115,10 @@ class Lab3Config:
             raise ValueError(f"epochs must be > 0, got {self.epochs}.")
 
         # Validate model settings
-        if self.model_type not in {"mlp", "cnn"}:
-            raise ValueError(f"model_type must be 'mlp' or 'cnn', got '{self.model_type}'.")
+        if self.model_type not in {"mlp", "cnn", "mobilenet"}:
+            raise ValueError(
+                f"model_type must be 'mlp', 'cnn', or 'mobilenet', got '{self.model_type}'."
+            )
         if not (0.0 <= self.dropout < 1.0):
             raise ValueError(f"dropout must be in [0.0, 1.0), got {self.dropout}.")
         if len(self.hidden_dims) == 0 or not all(dim > 0 for dim in self.hidden_dims):

@@ -234,9 +234,12 @@ def render_sidebar() -> tuple[CurrencyInferenceEngine | None, str, ImageProcessi
 
     if ckpt_source == "Local outputs/ (.pt)":
         if ckpts:
-            # Prefer best_cnn.pt by default when both CNN and MLP checkpoints exist
+            # Prefer best_mobilenet.pt, then best_cnn.pt by default when multiple checkpoints exist
             labels = [f"{p.parent.name}/{p.name}" for p in ckpts]
-            default_idx = next((i for i, p in enumerate(ckpts) if "cnn" in p.name.lower()), 0)
+            default_idx = next(
+                (i for i, p in enumerate(ckpts) if "mobilenet" in p.name.lower()),
+                next((i for i, p in enumerate(ckpts) if "cnn" in p.name.lower()), 0),
+            )
             chosen_idx = st.sidebar.selectbox(
                 "Trained Model (.pt)",
                 options=range(len(ckpts)),
